@@ -1,282 +1,317 @@
-<!DOCTYPE html>
+<!----Created by Dimitar Manolov--->
+<!doctype html>
 <html lang="bg">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Население на България по области — 2025 г.</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<style>
-  :root{
-    --paper:#f2ede3;
-    --ink:#2c2620;
-    --clay:#a1462f;
-    --clay-dark:#7d3423;
-    --slate:#3f5a5c;
-    --gold:#c8934f;
-    --line:#d8cfba;
-    --men:#3f6f76;
-    --women:#a1462f;
-  }
-  *{box-sizing:border-box;}
-  html,body{margin:0;height:100%;font-family:'Georgia', 'Iowan Old Style', serif;background:var(--paper);color:var(--ink);}
-  #map{position:absolute;inset:0;}
-
-  .site-header{
-    position:absolute; top:0; left:0; right:0; z-index:1200;
-    display:flex; align-items:baseline; gap:14px;
-    padding:14px 20px; pointer-events:none;
-  }
-  .site-header h1{
-    font-size:20px; letter-spacing:.04em; margin:0;
-    font-weight:700; color:var(--ink);
-    background:rgba(242,237,227,.92); padding:8px 14px;
-    border:1px solid var(--line); pointer-events:auto;
-  }
-  .site-header .subtitle{
-    font-family: 'Helvetica Neue', Arial, sans-serif;
-    font-size:11px; letter-spacing:.12em; text-transform:uppercase;
-    color:var(--slate); background:rgba(242,237,227,.92);
-    padding:8px 12px; border:1px solid var(--line); pointer-events:auto;
-    align-self:center;
-  }
-
-  .leaflet-popup-content-wrapper{
-    background:var(--paper); color:var(--ink);
-    border-radius:2px; border:1px solid var(--line);
-    box-shadow:0 6px 18px rgba(44,38,32,.25);
-  }
-  .leaflet-popup-tip{background:var(--paper); border:1px solid var(--line);}
-  .leaflet-popup-content{margin:0; width:290px !important; font-family:'Helvetica Neue', Arial, sans-serif;}
-
-  .pop-card{padding:14px 16px 16px;}
-  .pop-card h3{
-    font-family:'Georgia', serif; font-size:17px; margin:0 0 2px;
-    color:var(--clay-dark); font-weight:700;
-  }
-  .pop-card .region{
-    font-size:10px; letter-spacing:.1em; text-transform:uppercase;
-    color:var(--slate); margin:0 0 10px;
-  }
-  .pop-card .divider{border:none; border-top:1px solid var(--line); margin:10px 0;}
-
-  .stat-row{display:flex; justify-content:space-between; align-items:baseline; font-size:12px; margin-bottom:3px;}
-  .stat-row .label{color:#6b6357;}
-  .stat-row .value{font-weight:700; font-variant-numeric:tabular-nums;}
-
-  .block-label{
-    font-size:10px; letter-spacing:.1em; text-transform:uppercase;
-    color:var(--slate); margin:12px 0 5px;
-  }
-
-  .bar-track{background:#e6ddc9; height:9px; border-radius:0; position:relative; overflow:hidden; border:1px solid var(--line);}
-  .bar-fill{background:var(--gold); height:100%;}
-  .bar-caption{display:flex; justify-content:space-between; font-size:10px; color:#6b6357; margin-top:3px;}
-
-  .density-gauge{position:relative; height:9px; background:#e6ddc9; border:1px solid var(--line); margin-top:2px;}
-  .density-mark{position:absolute; top:-3px; width:2px; height:15px; background:var(--ink);}
-  .density-fill{position:absolute; top:0; left:0; bottom:0; background:var(--slate);}
-
-  .gender-bar{display:flex; height:22px; border:1px solid var(--line); overflow:hidden; margin-top:6px;}
-  .gender-men{background:var(--men);}
-  .gender-women{background:var(--women);}
-  .gender-labels{display:flex; justify-content:space-between; font-size:11px; margin-top:4px; font-weight:600;}
-  .gender-labels .men-l{color:var(--men);}
-  .gender-labels .women-l{color:var(--women);}
-  .dominant-note{
-    margin-top:8px; font-size:11px; font-style:italic; color:var(--ink);
-    background:#e9e1cd; padding:6px 8px; border-left:3px solid var(--gold);
-  }
-
-  .leaflet-control-layers{
-    font-family:'Helvetica Neue', Arial, sans-serif; font-size:12px;
-    background:var(--paper); border:1px solid var(--line); border-radius:2px;
-    color:var(--ink);
-  }
-
-  .legend{
-    background:rgba(242,237,227,.95); padding:10px 12px; border:1px solid var(--line);
-    font-family:'Helvetica Neue', Arial, sans-serif; font-size:11px; color:var(--ink);
-    line-height:1.5; max-width:190px;
-  }
-  .legend .legend-title{font-weight:700; letter-spacing:.05em; text-transform:uppercase; font-size:10px; margin-bottom:6px; color:var(--slate);}
-  .legend .swatch{display:inline-block; width:12px; height:12px; margin-right:6px; vertical-align:middle; border:1px solid rgba(0,0,0,.2);}
-</style>
-</head>
-<body>
-
-<div class="site-header">
-  <h1>Население на България — 2025</h1>
-  <div class="subtitle">по области · geopeace.bg</div>
-</div>
-
-<div id="map"></div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="data_embed.js"></script>
-<script>
-const fmt = n => n.toLocaleString('bg-BG');
-
-// ---- National aggregates (computed from the dataset) ----
-const totals = OBLASTI.features.reduce((acc,f)=>{
-  const p=f.properties;
-  acc.pop+=p.total; acc.men+=p.men; acc.women+=p.women; acc.area+=p.area_km2;
-  acc.maxPop=Math.max(acc.maxPop,p.total);
-  acc.maxDensity=Math.max(acc.maxDensity,p.density);
-  acc.minDensity=Math.min(acc.minDensity,p.density);
-  return acc;
-}, {pop:0,men:0,women:0,area:0,maxPop:0,maxDensity:0,minDensity:Infinity});
-const avgDensity = totals.pop/totals.area;
-
-// ---- Color ramps ----
-function densityColor(d){
-  // sequential clay ramp, quantile-ish breaks tuned to BG oblast densities
-  return d > 200 ? '#7d3423' :
-         d > 80  ? '#a1462f' :
-         d > 40  ? '#c8934f' :
-         d > 25  ? '#d9b98a' :
-                    '#e9dfc9';
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <title>Карта на населението на България - 2025 г.</title>
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+        <style>
+html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
 }
-function genderColor(pctWomen){
-  // diverging around 50% (in this dataset women >=50% everywhere,
-  // ramp shows the *margin* of dominance)
-  return pctWomen > 53 ? '#7d3423' :
-         pctWomen > 51.5 ? '#a1462f' :
-         pctWomen > 50.5 ? '#c48a68' :
-                            '#d9b8a4';
+body {
+    display: flex;
+    flex-direction: column;
 }
-
-function styleDensity(f){
-  return {color:'#2c2620', weight:1, fillColor:densityColor(f.properties.density), fillOpacity:.85};
+.map-title-bar {
+    width: 100%;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    padding: 10px 14px;
+    font: bold 19px/1.3 Arial, Helvetica, sans-serif;
+    color: #1a1a1a;
+    background: #f7f7f7;
+    border: 1px solid #ddd;
+    border-bottom: none;
 }
-function styleGender(f){
-  const p=f.properties;
-  const pctWomen = 100*p.women/p.total;
-  return {color:'#2c2620', weight:1, fillColor:genderColor(pctWomen), fillOpacity:.85};
+.map-title-bar .subtitle {
+    font: normal 12px/1.3 Arial, Helvetica, sans-serif;
+    color: #666;
+    margin-top: 2px;
 }
-
-function popupHTML(p){
-  const pctOfMax = Math.round(100*p.total/totals.maxPop);
-  const densityPct = Math.min(100, Math.round(100*p.density/totals.maxDensity));
-  const densityVsAvg = p.density >= avgDensity ? 'над средната' : 'под средната';
-  const pctMen = 100*p.men/p.total;
-  const pctWomen = 100*p.women/p.total;
-  const menBarPct = pctMen.toFixed(1);
-  const womenBarPct = pctWomen.toFixed(1);
-  const dominant = p.women > p.men ? 'жени' : (p.men > p.women ? 'мъже' : 'равен брой');
-  const diff = Math.abs(p.women - p.men);
-  const diffPct = Math.abs(pctWomen-pctMen).toFixed(1);
-
-  return `
-  <div class="pop-card">
-    <h3>${p.name.split(' (')[0]}</h3>
-    <p class="region">Област · EKATTE ${p.dist_code}</p>
-
-    <div class="stat-row"><span class="label">Население</span><span class="value">${fmt(p.total)}</span></div>
-    <div class="stat-row"><span class="label">Площ</span><span class="value">${fmt(p.area_km2)} км²</span></div>
-
-    <div class="block-label">Дял от най-населената област (София-град)</div>
-    <div class="bar-track"><div class="bar-fill" style="width:${pctOfMax}%"></div></div>
-    <div class="bar-caption"><span>${pctOfMax}% от ${fmt(totals.maxPop)}</span></div>
-
-    <div class="block-label">Гъстота на населението</div>
-    <div class="density-gauge">
-      <div class="density-fill" style="width:${densityPct}%"></div>
-      <div class="density-mark" style="left:${Math.min(100,Math.round(100*avgDensity/totals.maxDensity))}%" title="средна за страната"></div>
-    </div>
-    <div class="bar-caption"><span>${p.density} души/км² — ${densityVsAvg} (${avgDensity.toFixed(1)} души/км² средно)</span></div>
-
-    <hr class="divider">
-
-    <div class="block-label">Разпределение по пол</div>
-    <div class="gender-bar">
-      <div class="gender-men" style="width:${menBarPct}%"></div>
-      <div class="gender-women" style="width:${womenBarPct}%"></div>
-    </div>
-    <div class="gender-labels">
-      <span class="men-l">Мъже ${fmt(p.men)} (${menBarPct}%)</span>
-      <span class="women-l">Жени ${fmt(p.women)} (${womenBarPct}%)</span>
-    </div>
-    <div class="dominant-note">
-      Доминират <strong>${dominant}</strong> — с ${fmt(diff)} души повече (${diffPct} пр.п. разлика).
-    </div>
-  </div>`;
+#map {
+    width: 100%;
+    flex: 1;
+    min-height: 0;
 }
+.info.legend {
+    background: rgba(255,255,255,0.92);
+    border-radius: 6px;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+    font: 13px/1.4 Arial, Helvetica, sans-serif;
+    color: #222;
+    max-width: 220px;
+    overflow: hidden;
+}
+.legend-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    cursor: pointer;
+    user-select: none;
+    font-weight: bold;
+    font-size: 13px;
+}
+.legend-toggle .arrow {
+    transition: transform 0.15s ease;
+    font-size: 11px;
+    margin-left: 8px;
+}
+.info.legend.collapsed .legend-toggle .arrow {
+    transform: rotate(-90deg);
+}
+.legend-body {
+    padding: 0 12px 10px;
+    max-height: 500px;
+    transition: max-height 0.15s ease;
+}
+.info.legend.collapsed .legend-body {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    overflow: hidden;
+}
+.info.legend h4 {
+    margin: 0 0 6px;
+    font-size: 13px;
+    font-weight: bold;
+}
+.legend-section + .legend-section {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid #ddd;
+}
+.legend-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 3px;
+}
+.legend-swatch {
+    width: 16px;
+    height: 16px;
+    margin-right: 6px;
+    border: 1px solid rgba(35,35,35,0.6);
+    flex-shrink: 0;
+}
+.legend-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    margin-right: 6px;
+    border: 1px solid rgba(35,35,35,0.6);
+    flex-shrink: 0;
+}
+.pie-marker {
+    border-radius: 50%;
+    border: 1px solid rgba(35,35,35,0.75);
+    box-shadow: 0 0 2px rgba(0,0,0,0.5);
+}
+.popup-title {
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+.popup-table td {
+    padding: 1px 4px;
+}
+.popup-table td.label {
+    color: #555;
+}
+.popup-bar-wrap {
+    width: 140px;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #de77ae;
+    margin-top: 2px;
+}
+.popup-bar-men {
+    height: 8px;
+    background: #3182bd;
+}
+.popup-note {
+    margin-top: 6px;
+    font-size: 11px;
+    color: #555;
+    font-style: italic;
+}
+        </style>
+        <title>Население на България по области — 2025</title>
+    </head>
+    <body>
+        <div class="map-title-bar">
+            Население на България по области — 2025
+            <div class="subtitle">Обща численост, разпределение по пол и гъстота на населението &middot; данни: НСИ</div>
+        </div>
+        <div id="map"></div>
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script src="leaflet-hash.js"></script>
+        <script src="data_embed.js"></script>
+        <script>
 
-const map = L.map('map', {zoomControl:false}).setView([42.75,25.2], 8);
-L.control.zoom({position:'bottomright'}).addTo(map);
+        if (typeof OBLASTI === 'undefined') {
+            document.getElementById('map').innerHTML = '<div style="padding:40px;font:16px Arial;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;margin:20px;">' +
+                '<b>Грешка:</b> Данните за картата не са заредени (<code>data_embed.js</code>).<br><br>' +
+                'Качи и двата файла: index.html и data_embed.js в една папка.' +
+                '</div>';
+            throw new Error('OBLASTI is undefined');
+        }
 
-L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; OpenStreetMap, &copy; CARTO · Данни: НСИ',
-  maxZoom: 18
-}).addTo(map);
+        var map = L.map('map', { zoomControl: false, maxZoom: 18, minZoom: 6 })
+            .fitBounds([[41.15, 22.28], [44.28, 28.68]]);
+        var hash = new L.Hash(map);
 
-const densityLayer = L.geoJSON(OBLASTI, {
-  style: styleDensity,
-  onEachFeature: (f, layer) => {
-    layer.bindPopup(popupHTML(f.properties));
-    layer.on('mouseover', () => layer.setStyle({weight:2.5}));
-    layer.on('mouseout', () => layer.setStyle({weight:1}));
-  }
-});
+        L.control.zoom({ position: 'topleft' }).addTo(map);
 
-const genderLayer = L.geoJSON(OBLASTI, {
-  style: styleGender,
-  onEachFeature: (f, layer) => {
-    layer.bindPopup(popupHTML(f.properties));
-    layer.on('mouseover', () => layer.setStyle({weight:2.5}));
-    layer.on('mouseout', () => layer.setStyle({weight:1}));
-  }
-});
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap, &copy; CARTO',
+            maxZoom: 19
+        }).addTo(map);
 
-densityLayer.addTo(map);
+        map.attributionControl.setPrefix('Данни: НСИ &middot; <a href="https://leafletjs.com">Leaflet</a>');
 
-L.control.layers(
-  {
-    'Гъстота на населението': densityLayer,
-    'Полово съотношение (доминиране на пола)': genderLayer
-  },
-  null,
-  {collapsed:false, position:'topright'}
-).addTo(map);
+        // ---- PuBu quantile choropleth by density ----
+        var densityBreaks = [16.3, 19.3, 21.2, 23.7, 27.1, 30.9, 36.4, 50.2];
+        var densityColors = [
+            '#fff7fb', '#ece7f2', '#d0d1e6', '#a6bddb',
+            '#74a9cf', '#3690c0', '#0570b0', '#045a8d', '#023858'
+        ];
+        function densityColor(d) {
+            for (var i = 0; i < densityBreaks.length; i++) {
+                if (d <= densityBreaks[i]) return densityColors[i];
+            }
+            return densityColors[densityColors.length - 1];
+        }
+        function style__0(feature) {
+            return {
+                weight: 1,
+                color: '#4d4d4d',
+                fillColor: densityColor(feature.properties.density),
+                fillOpacity: 0.85
+            };
+        }
 
-// ---- Legends that swap with the active layer ----
-const legend = L.control({position:'bottomleft'});
-legend.onAdd = function(){
-  this._div = L.DomUtil.create('div','legend');
-  this.update('density');
-  return this._div;
-};
-legend.update = function(mode){
-  if(mode==='density'){
-    this._div.innerHTML = `
-      <div class="legend-title">Гъстота (души/км²)</div>
-      <div><span class="swatch" style="background:#e9dfc9"></span>&lt; 25</div>
-      <div><span class="swatch" style="background:#d9b98a"></span>25–40</div>
-      <div><span class="swatch" style="background:#c8934f"></span>40–80</div>
-      <div><span class="swatch" style="background:#a1462f"></span>80–200</div>
-      <div><span class="swatch" style="background:#7d3423"></span>&gt; 200</div>
-      <div style="margin-top:6px; color:#6b6357;">Средно за страната: ${avgDensity.toFixed(1)} души/км²</div>`;
-  } else {
-    this._div.innerHTML = `
-      <div class="legend-title">Дял на жените</div>
-      <div><span class="swatch" style="background:#d9b8a4"></span>50–50.5%</div>
-      <div><span class="swatch" style="background:#c48a68"></span>50.5–51.5%</div>
-      <div><span class="swatch" style="background:#a1462f"></span>51.5–53%</div>
-      <div><span class="swatch" style="background:#7d3423"></span>&gt; 53%</div>
-      <div style="margin-top:6px; color:#6b6357;">Жените са мнозинство във всички области.</div>`;
-  }
-};
-legend.addTo(map);
+        var fmt = function(n) { return n.toLocaleString('bg-BG'); };
 
-map.on('baselayerchange overlayadd', function(){});
-map.on('layeradd', function(e){
-  if(e.layer===genderLayer) legend.update('gender');
-  if(e.layer===densityLayer) legend.update('density');
-});
-map.on('layerremove', function(e){
-  if(map.hasLayer(genderLayer)) legend.update('gender');
-  else if(map.hasLayer(densityLayer)) legend.update('density');
-});
-</script>
-</body>
+        function pop__0(feature, layer) {
+            var p = feature.properties;
+            var total = p.total, men = p.men, women = p.women;
+            var menPct = total ? Math.round((men / total) * 100) : 0;
+            var womenPct = 100 - menPct;
+            var dominant = women > men ? 'жени' : (men > women ? 'мъже' : 'равен брой');
+            var diff = Math.abs(women - men);
+            var name = p.name.split(' (')[0];
+            var popupContent =
+                '<div class="popup-title">' + name + '</div>' +
+                '<table class="popup-table">' +
+                    '<tr><td class="label">Общо население:</td><td><b>' + fmt(total) + '</b></td></tr>' +
+                    '<tr><td class="label">Мъже:</td><td>' + fmt(men) + ' (' + menPct + '%)</td></tr>' +
+                    '<tr><td class="label">Жени:</td><td>' + fmt(women) + ' (' + womenPct + '%)</td></tr>' +
+                    '<tr><td class="label">Площ:</td><td>' + fmt(p.area_km2) + ' km²</td></tr>' +
+                    '<tr><td class="label">Средна гъстота:</td><td>' + p.density + ' души/km²</td></tr>' +
+                '</table>' +
+                '<div class="popup-bar-wrap"><div class="popup-bar-men" style="width:' + menPct + '%"></div></div>' +
+                '<div class="popup-note">Доминират <b>' + dominant + '</b> — с ' + fmt(diff) + ' души повече.</div>';
+            layer.bindPopup(popupContent, { maxHeight: 400 });
+        }
+
+        var layer__0 = L.geoJson(OBLASTI, {
+            interactive: true,
+            onEachFeature: pop__0,
+            style: style__0
+        }).addTo(map);
+
+        // ---- Диаграми (кръгови - мъже/жени) за всяка област ----
+        var MEN_COLOR = '#3182bd';
+        var WOMEN_COLOR = '#de77ae';
+        var pieMinRadius = 6, pieMaxRadius = 16;
+        var totals = OBLASTI.features.map(function(f) { return f.properties.total; });
+        var minTotal = Math.min.apply(null, totals);
+        var maxTotal = Math.max.apply(null, totals);
+
+        function pieRadius(total) {
+            if (maxTotal === minTotal) return (pieMinRadius + pieMaxRadius) / 2;
+            var t = (total - minTotal) / (maxTotal - minTotal);
+            return pieMinRadius + Math.sqrt(t) * (pieMaxRadius - pieMinRadius);
+        }
+
+        function pieIcon(men, women, radius) {
+            var total = men + women;
+            var menPct = total ? (men / total * 100) : 50;
+            var size = radius * 2;
+            var html = '<div class="pie-marker" style="width:' + size + 'px;height:' + size + 'px;' +
+                'background:conic-gradient(' + MEN_COLOR + ' 0% ' + menPct + '%, ' + WOMEN_COLOR + ' ' + menPct + '% 100%);"></div>';
+            return L.divIcon({
+                className: '',
+                html: html,
+                iconSize: [size, size],
+                iconAnchor: [size / 2, size / 2]
+            });
+        }
+
+        var diagramLayer = L.layerGroup([]);
+        layer__0.eachLayer(function(featLayer) {
+            var p = featLayer.feature.properties;
+            var center = featLayer.getBounds().getCenter();
+            var marker = L.marker(center, {
+                icon: pieIcon(p.men, p.women, pieRadius(p.total)),
+                interactive: true,
+                zIndexOffset: 1000
+            });
+            pop__0(featLayer.feature, marker);
+            diagramLayer.addLayer(marker);
+        });
+        diagramLayer.addTo(map);
+
+        // ---- Легенда ----
+        var densityClasses = [
+            { range: 'до 16.3', color: densityColors[0] },
+            { range: '16.3 – 19.3', color: densityColors[1] },
+            { range: '19.3 – 21.2', color: densityColors[2] },
+            { range: '21.2 – 23.7', color: densityColors[3] },
+            { range: '23.7 – 27.1', color: densityColors[4] },
+            { range: '27.1 – 30.9', color: densityColors[5] },
+            { range: '30.9 – 36.4', color: densityColors[6] },
+            { range: '36.4 – 50.2', color: densityColors[7] },
+            { range: 'над 50.2', color: densityColors[8] }
+        ];
+
+        var legend = L.control({ position: 'bottomright' });
+        legend.onAdd = function() {
+            var div = L.DomUtil.create('div', 'info legend');
+            var body = '<div class="legend-section">';
+            body += '<h4>Гъстота на населението</h4>';
+            body += '<div style="font-size:11px;color:#555;margin-bottom:4px;">души / km²</div>';
+            densityClasses.forEach(function(c) {
+                body += '<div class="legend-row"><span class="legend-swatch" style="background:' + c.color + '"></span>' + c.range + '</div>';
+            });
+            body += '</div>';
+            body += '<div class="legend-section">';
+            body += '<h4>Диаграма: пол</h4>';
+            body += '<div class="legend-row"><span class="legend-dot" style="background:' + MEN_COLOR + '"></span>Мъже</div>';
+            body += '<div class="legend-row"><span class="legend-dot" style="background:' + WOMEN_COLOR + '"></span>Жени</div>';
+            body += '<div style="font-size:11px;color:#555;margin-top:2px;">размерът на кръга = общо население</div>';
+            body += '</div>';
+            div.innerHTML =
+                '<div class="legend-toggle">Легенда<span class="arrow">▼</span></div>' +
+                '<div class="legend-body">' + body + '</div>';
+            L.DomEvent.disableClickPropagation(div);
+            div.querySelector('.legend-toggle').addEventListener('click', function() {
+                div.classList.toggle('collapsed');
+            });
+            return div;
+        };
+        legend.addTo(map);
+
+        </script>
+    </body>
 </html>
